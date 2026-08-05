@@ -1,0 +1,112 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - production
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out triggering commit
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  staging:
+    if: github.ref_name == 'main'
+    needs: quality
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Deploy to staging via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_ENV_FILE: .env.staging
+          DEPLOY_SHA: ${{ github.sha }}
+          API_KEYS: ${{ secrets.API_KEYS }}
+          WA_ACCESS_TOKEN: ${{ secrets.WA_ACCESS_TOKEN }}
+          WA_PHONE_NUMBER_ID: ${{ secrets.WA_PHONE_NUMBER_ID }}
+          WA_WEBHOOK_VERIFY_TOKEN: ${{ secrets.WA_WEBHOOK_VERIFY_TOKEN }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          envs: APP_ENV_FILE,DEPLOY_SHA,API_KEYS,WA_ACCESS_TOKEN,WA_PHONE_NUMBER_ID,WA_WEBHOOK_VERIFY_TOKEN
+          command_timeout: 20m
+          script: |
+            set -e
+            cd ${{ secrets.STAGING_APP_DIR }}
+            test -n "$API_KEYS"
+            test -n "$WA_ACCESS_TOKEN"
+            test -n "$WA_PHONE_NUMBER_ID"
+            test -n "$WA_WEBHOOK_VERIFY_TOKEN"
+            umask 077
+            awk '!/^(API_KEYS|WA_ACCESS_TOKEN|WA_PHONE_NUMBER_ID|WA_WEBHOOK_VERIFY_TOKEN)=/' .env.staging > .env.staging.tmp
+            printf '\nAPI_KEYS=%s\nWA_ACCESS_TOKEN=%s\nWA_PHONE_NUMBER_ID=%s\nWA_WEBHOOK_VERIFY_TOKEN=%s\n' \
+              "$API_KEYS" "$WA_ACCESS_TOKEN" "$WA_PHONE_NUMBER_ID" "$WA_WEBHOOK_VERIFY_TOKEN" >> .env.staging.tmp
+            mv .env.staging.tmp .env.staging
+            git fetch origin "$DEPLOY_SHA"
+            git checkout --detach "$DEPLOY_SHA"
+            docker builder prune --all --force --filter "until=168h"
+            docker compose --env-file .env.staging -f docker-compose.prod.example.yml build
+            docker compose --env-file .env.staging -f docker-compose.prod.example.yml up -d --wait --wait-timeout 120
+            docker builder prune --all --force
+            docker image prune --force
+
+  production:
+    if: github.ref_name == 'production'
+    needs: quality
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to production via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_ENV_FILE: .env.production
+          DEPLOY_SHA: ${{ github.sha }}
+          API_KEYS: ${{ secrets.API_KEYS }}
+          WA_ACCESS_TOKEN: ${{ secrets.WA_ACCESS_TOKEN }}
+          WA_PHONE_NUMBER_ID: ${{ secrets.WA_PHONE_NUMBER_ID }}
+          WA_WEBHOOK_VERIFY_TOKEN: ${{ secrets.WA_WEBHOOK_VERIFY_TOKEN }}
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          envs: APP_ENV_FILE,DEPLOY_SHA,API_KEYS,WA_ACCESS_TOKEN,WA_PHONE_NUMBER_ID,WA_WEBHOOK_VERIFY_TOKEN
+          timeout: 20m
+          script: |
+            set -e
+            cd ${{ secrets.PROD_APP_DIR }}
+            test -n "$API_KEYS"
+            test -n "$WA_ACCESS_TOKEN"
+            test -n "$WA_PHONE_NUMBER_ID"
+            test -n "$WA_WEBHOOK_VERIFY_TOKEN"
+            umask 077
+            awk '!/^(API_KEYS|WA_ACCESS_TOKEN|WA_PHONE_NUMBER_ID|WA_WEBHOOK_VERIFY_TOKEN)=/' .env.production > .env.production.tmp
+            printf '\nAPI_KEYS=%s\nWA_ACCESS_TOKEN=%s\nWA_PHONE_NUMBER_ID=%s\nWA_WEBHOOK_VERIFY_TOKEN=%s\n' \
+              "$API_KEYS" "$WA_ACCESS_TOKEN" "$WA_PHONE_NUMBER_ID" "$WA_WEBHOOK_VERIFY_TOKEN" >> .env.production.tmp
+            mv .env.production.tmp .env.production
+            git fetch origin "$DEPLOY_SHA"
+            git checkout --detach "$DEPLOY_SHA"
+            docker compose --env-file .env.production -f docker-compose.prod.example.yml build
+            docker compose --env-file .env.production -f docker-compose.prod.example.yml up -d
+            docker builder prune --all --force
+            docker image prune --force
