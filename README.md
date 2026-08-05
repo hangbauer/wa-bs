@@ -106,3 +106,54 @@ otp:ip:<ip>                         # per-IP counter — TTL = 15 min
 docker build -t wa-bs .
 docker run --env-file .env -p 3000:3000 wa-bs
 ```
+
+### Production / staging
+
+Local (dev only, exposes Redis on a public port):
+
+```bash
+docker compose up -d
+```
+
+To emulate production, run the whole stack (Redis on an internal port only):
+
+```bash
+cp .env.production.example .env.production
+docker compose --env-file .env.production -f docker-compose.prod.example.yml up -d --build
+```
+
+The `api` container binds to `127.0.0.1:3000`, so put it behind a reverse proxy (Caddy/Nginx) for HTTPS. `/healthz` returns `200` only when Redis is reachable, so it works as a container healthcheck.
+
+## CI/CD deployment
+
+`.github/workflows/deploy.yml` follows the same pattern as the Pilates pilates-a repo:
+
+- Every push to `main` / `production` runs a **quality** job (`npm ci` → `typecheck` → `test` → `build`).
+- Pushes to **`main`** then SSH-deploy to **staging**; pushes to **`production`** deploy to **production**.
+- The server is expected to have a git checkout of the repo; the SSH script checks out the exact commit SHA, then `docker compose ... build` and `up -d --wait`.
+
+### Server prep (once)
+
+```bash
+git clone git@github.com:<org>/wa-bs.git /opt/wa-bs
+cd /opt/wa-bs
+cp .env.production.example .env.staging   # or .env.production
+docker compose --file docker-compose.prod.example.yml config > /dev/null   # sanity check
+```
+
+### GitHub configuration
+
+Secrets (repo-level or in the `staging`/`production` environments):
+
+| Secret             | Use                                              |
+| ------------------ | ------------------------------------------------ |
+| `STAGING_HOST` / `PROD_HOST`  | Server IP/hostname                    |
+| `STAGING_USER` / `PROD_USER`  | SSH user                            |
+| `STAGING_SSH_KEY` / `PROD_SSH_KEY` | Private SSH key                |
+| `STAGING_APP_DIR` / `PROD_APP_DIR` | Repo path on the server      |
+| `API_KEYS`         | `key:appName,key2:app2` for every consumer app  |
+| `WA_ACCESS_TOKEN`  | Meta WhatsApp Cloud API access token            |
+| `WA_PHONE_NUMBER_ID` | Meta WhatsApp phone number ID                |
+| `WA_WEBHOOK_VERIFY_TOKEN` | Webhook verification token           |
+
+Non-secret values (port, OTP defaults, `WA_API_VERSION`, `WA_TEMPLATE_NAME`, …) live in the server-side `.env.staging` / `.env.production` files; the workflow injects only the secrets above on every deploy.
