@@ -30,15 +30,6 @@ jobs:
       - name: Build
         run: npm run build
 
-  debug-net:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Probe staging host connectivity
-        run: |
-          echo "runner egress IP: $(curl -s --max-time 10 ifconfig.me || echo unknown)"
-          nc -zv -w 6 216.158.237.140 22 && echo "PORT_22_OPEN" || echo "PORT_22_BLOCKED"
-          nc -zv -w 6 216.158.237.140 80 && echo "PORT_80_OPEN" || echo "PORT_80_BLOCKED"
-          curl -s --max-time 6 -o /dev/null -w "HTTP_TO_SERVER: %{http_code}\n" http://216.158.237.140/ || echo "HTTP_TO_SERVER: FAILED"
   staging:
     if: github.ref_name == 'main'
     needs: quality
