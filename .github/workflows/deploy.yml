@@ -55,8 +55,6 @@ jobs:
             set -e
             cd ${{ secrets.STAGING_APP_DIR }}
             test -n "$API_KEYS"
-            test -n "$WA_ACCESS_TOKEN"
-            test -n "$WA_PHONE_NUMBER_ID"
             test -n "$WA_WEBHOOK_VERIFY_TOKEN"
             umask 077
             awk '!/^(API_KEYS|WA_ACCESS_TOKEN|WA_PHONE_NUMBER_ID|WA_WEBHOOK_VERIFY_TOKEN)=/' .env.staging > .env.staging.tmp
