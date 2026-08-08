@@ -157,3 +157,9 @@ Secrets (repo-level or in the `staging`/`production` environments):
 | `WA_WEBHOOK_VERIFY_TOKEN` | Webhook verification token           |
 
 Non-secret values (port, OTP defaults, `WA_API_VERSION`, `WA_TEMPLATE_NAME`, …) live in the server-side `.env.staging` / `.env.production` files; the workflow injects only the secrets above on every deploy.
+
+### Staging
+
+- Base URL: `https://api.wa-staging.pronteralabs.id`
+- Health check: `GET /healthz` → `{"status":"ok"}`
+- Nginx terminates TLS; the API binds to `127.0.0.1:3002`.
