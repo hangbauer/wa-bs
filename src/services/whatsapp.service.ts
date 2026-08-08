@@ -33,7 +33,7 @@ export class WhatsAppService {
           type: "template",
           template: {
             name: this.cfg.WA_TEMPLATE_NAME,
-            language: { code: "en" },
+            language: { code: this.cfg.WA_TEMPLATE_LANGUAGE },
             components: [
               {
                 type: "body",
