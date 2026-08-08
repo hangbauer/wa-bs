@@ -98,6 +98,10 @@ jobs:
             test -n "$WA_ACCESS_TOKEN"
             test -n "$WA_PHONE_NUMBER_ID"
             test -n "$WA_WEBHOOK_VERIFY_TOKEN"
+            if grep -q '^WA_SEND_MODE=text' .env.production; then
+              echo "::error::WA_SEND_MODE=text is a staging-only debug mode"
+              exit 1
+            fi
             umask 077
             awk '!/^(API_KEYS|WA_ACCESS_TOKEN|WA_PHONE_NUMBER_ID|WA_WEBHOOK_VERIFY_TOKEN)=/' .env.production > .env.production.tmp
             printf '\nAPI_KEYS=%s\nWA_ACCESS_TOKEN=%s\nWA_PHONE_NUMBER_ID=%s\nWA_WEBHOOK_VERIFY_TOKEN=%s\n' \

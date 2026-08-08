@@ -25,6 +25,7 @@ const envSchema = z.object({
   WA_PHONE_NUMBER_ID: z.string().default(""),
   WA_TEMPLATE_NAME: z.string().default("otp_verification"),
   WA_TEMPLATE_LANGUAGE: z.string().default("en"),
+  WA_SEND_MODE: z.enum(["template", "text"]).default("template"),
   WA_WEBHOOK_VERIFY_TOKEN: z.string().default(""),
   OTP_LENGTH: z.coerce.number().int().min(4).max(10).default(6),
   OTP_EXPIRY_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),

@@ -27,24 +27,35 @@ export class WhatsAppService {
           Authorization: `Bearer ${this.cfg.WA_ACCESS_TOKEN}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to,
-          type: "template",
-          template: {
-            name: this.cfg.WA_TEMPLATE_NAME,
-            language: { code: this.cfg.WA_TEMPLATE_LANGUAGE },
-            components: [
-              {
-                type: "body",
-                parameters: [
-                  { type: "text", text: code },
-                  { type: "text", text: String(expiryMinutes) },
-                ],
-              },
-            ],
-          },
-        }),
+        body: JSON.stringify(
+          this.cfg.WA_SEND_MODE === "text"
+            ? {
+                messaging_product: "whatsapp",
+                to,
+                type: "text",
+                text: {
+                  body: `Your verification code is ${code}. It expires in ${expiryMinutes} minutes.`,
+                },
+              }
+            : {
+                messaging_product: "whatsapp",
+                to,
+                type: "template",
+                template: {
+                  name: this.cfg.WA_TEMPLATE_NAME,
+                  language: { code: this.cfg.WA_TEMPLATE_LANGUAGE },
+                  components: [
+                    {
+                      type: "body",
+                      parameters: [
+                        { type: "text", text: code },
+                        { type: "text", text: String(expiryMinutes) },
+                      ],
+                    },
+                  ],
+                },
+              }
+        ),
       }
     );
 
